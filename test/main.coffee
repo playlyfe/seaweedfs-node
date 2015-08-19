@@ -54,37 +54,49 @@ before (next) ->
     log_level: 'debug'
   })
   tmp = os.tmpDir()
-
-  rm "./image.txt"
-  rm '-rf', "#{tmp}/1", "#{tmp}/2", "#{tmp}/3", "#{tmp}/m1", "#{tmp}/m2", "#{tmp}/m3"
-  mkdir "#{tmp}/1", "#{tmp}/2", "#{tmp}/3", "#{tmp}/m1", "#{tmp}/m2", "#{tmp}/m3"
-  spawn('./weed', ['master' ,'-port=9333', '-defaultReplication=010', "-mdir=#{tmp}/m1"])
-  .then (ps) =>
-    @m1 = ps
-    workers.push ps
-    spawn('./weed', ['master', '-port=9334', '-defaultReplication=010', '-peers=localhost:9333', "-mdir=#{tmp}/m2"])
-  .then (ps) =>
-    @m2 = ps
-    workers.push ps
-    spawn('./weed', ['master', '-port=9335', '-defaultReplication=010', '-peers=localhost:9333', "-mdir=#{tmp}/m3"])
-  .then (ps) =>
-    @m3 = ps
-    workers.push ps
-    spawn('./weed', ['volume', '-port=8080', "-dir=#{tmp}/1", '-max=2', '-rack=r1', '-dataCenter=dc1', '-mserver=localhost:9333'])
-  .then (ps) =>
-    @v1 = ps
-    workers.push ps
-    spawn('./weed', ['volume', '-port=8081', "-dir=#{tmp}/2", '-max=2', '-rack=r2', '-dataCenter=dc1', '-mserver=localhost:9333'])
-  .then (ps) =>
-    @v2 = ps
-    workers.push ps
-    spawn('./weed', ['volume', '-port=8082', "-dir=#{tmp}/3", '-max=2', '-rack=r3', '-dataCenter=dc1', '-mserver=localhost:9333'])
-  .then (ps) =>
-    @v3 = ps
-    workers.push ps
-    @ws.connect()
-  .then ->
-    next()
+  fs = require('fs')
+  targz = require('tar.gz')
+  request = require('request')
+  if not fs.existsSync('./weed')
+    console.log 'Downloading Weedfs Binary'
+    request.get('http://bintray.com/artifact/download/chrislusf/seaweedfs/weed_0.70beta_linux_amd64.tar.gz')
+    .pipe(targz().createWriteStream(process.cwd()))
+    .on('finish', ->
+      mv 'weed_0.70beta_linux_amd64/weed', process.cwd()
+      rm '-rf', 'weed_0.70beta_linux_amd64/'
+      throw new Error('Please Restart the tests')
+    )
+  else
+    rm "./image.txt"
+    rm '-rf', "#{tmp}/1", "#{tmp}/2", "#{tmp}/3", "#{tmp}/m1", "#{tmp}/m2", "#{tmp}/m3"
+    mkdir "#{tmp}/1", "#{tmp}/2", "#{tmp}/3", "#{tmp}/m1", "#{tmp}/m2", "#{tmp}/m3"
+    spawn('./weed', ['master' ,'-port=9333', '-defaultReplication=010', "-mdir=#{tmp}/m1"])
+    .then (ps) =>
+      @m1 = ps
+      workers.push ps
+      spawn('./weed', ['master', '-port=9334', '-defaultReplication=010', '-peers=localhost:9333', "-mdir=#{tmp}/m2"])
+    .then (ps) =>
+      @m2 = ps
+      workers.push ps
+      spawn('./weed', ['master', '-port=9335', '-defaultReplication=010', '-peers=localhost:9333', "-mdir=#{tmp}/m3"])
+    .then (ps) =>
+      @m3 = ps
+      workers.push ps
+      spawn('./weed', ['volume', '-port=8080', "-dir=#{tmp}/1", '-max=2', '-rack=r1', '-dataCenter=dc1', '-mserver=localhost:9333'])
+    .then (ps) =>
+      @v1 = ps
+      workers.push ps
+      spawn('./weed', ['volume', '-port=8081', "-dir=#{tmp}/2", '-max=2', '-rack=r2', '-dataCenter=dc1', '-mserver=localhost:9333'])
+    .then (ps) =>
+      @v2 = ps
+      workers.push ps
+      spawn('./weed', ['volume', '-port=8082', "-dir=#{tmp}/3", '-max=2', '-rack=r3', '-dataCenter=dc1', '-mserver=localhost:9333'])
+    .then (ps) =>
+      @v3 = ps
+      workers.push ps
+      @ws.connect()
+    .then ->
+      next()
 
 describe 'Weedfs Client in a broken Cluster', ->
 
